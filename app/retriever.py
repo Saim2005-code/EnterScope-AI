@@ -174,4 +174,4 @@ class EnterpriseRAGRetriever:
                 "llm_generation_ms": 0.0,
                 "total_latency_ms": round(retrieval_ms, 2),
             },
-        }
+        } 

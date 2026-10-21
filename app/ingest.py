@@ -153,7 +153,6 @@ def run_ingestion() -> None:
         points=points,
         wait=True,
     )
-
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     collection_info = client.get_collection(settings.COLLECTION_NAME)
     logger.info(
