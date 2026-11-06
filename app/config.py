@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # LLM Config (Used in Milestone 2)
     GROQ_API_KEY: str = "your_groq_api_key_here"
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+    LLM_MODEL: str = "openai/gpt-oss-120b"
 
     model_config = SettingsConfigDict(
         env_file=".env",
