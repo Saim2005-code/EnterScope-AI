@@ -15,7 +15,8 @@ SYSTEM_PROMPT = """You are a strict Enterprise Audit & Knowledge Assistant.
 Answer the user's question ONLY using the verified context chunks provided below.
 
 CRITICAL RULES:
-1. Every factual claim MUST include an inline citation in the exact format: [filename.pdf, Page X].
+1. Every factual claim MUST include an inline citation in the exact format:
+   [filename.pdf, Page X].
 2. Do NOT extrapolate, guess, or use outside knowledge.
 3. If the provided context does not explicitly contain the answer, respond ONLY with:
    "Insufficient permissions or data not found for your role."
@@ -36,7 +37,9 @@ class EnterpriseRAGRetriever:
         )
         self.groq_client = (
             Groq(api_key=settings.GROQ_API_KEY)
-            if settings.GROQ_API_KEY and settings.GROQ_API_KEY != "your_groq_api_key_here"
+            if settings.GROQ_API_KEY
+            and settings.GROQ_API_KEY
+            not in ("your_groq_api_key_here", "your_groq_api_here")
             else None
         )
 
@@ -47,7 +50,9 @@ class EnterpriseRAGRetriever:
         top_k: int = 3,
         score_threshold: float = -3.0,
     ) -> dict[str, Any]:
-        """Executes Pipeline 3 (RBAC Retrieval + Rerank) & Pipeline 4 (Guardrailed LLM)."""
+        """
+        Executes Pipeline 3 (RBAC Retrieval + Rerank) & Pipeline 4 (Guardrailed LLM).
+        """
         total_start = time.perf_counter()
         retrieval_start = time.perf_counter()
 
@@ -81,11 +86,11 @@ class EnterpriseRAGRetriever:
             return self._abstain_response(normalized_role, filter_str, retrieval_ms)
 
         # 3. Two-Stage ONNX Cross-Encoder Reranking
-        candidate_texts = [pt.payload["text"] for pt in search_result]
+        candidate_texts = [(pt.payload or {}).get("text", "") for pt in search_result]
         rerank_scores = list(self.reranker.rerank(query, candidate_texts))
 
         scored_candidates = sorted(
-            zip(search_result, rerank_scores),
+            zip(search_result, rerank_scores, strict=True),
             key=lambda x: x[1],
             reverse=True,
         )
@@ -106,24 +111,30 @@ class EnterpriseRAGRetriever:
         context_blocks: list[str] = []
 
         for pt, score in verified_hits:
-            payload = pt.payload
+            payload = pt.payload or {}
+            source_file = payload.get("source_file", "unknown")
+            page_number = payload.get("page_number", 0)
+            department = payload.get("department", normalized_role)
+            text_content = payload.get("text", "")
+
             citations.append(
                 {
-                    "source_file": payload["source_file"],
-                    "page_number": payload["page_number"],
-                    "department": payload["department"],
+                    "source_file": source_file,
+                    "page_number": page_number,
+                    "department": department,
                     "rerank_score": round(score, 4),
-                    "chunk_preview": payload["text"][:160] + "...",
+                    "chunk_preview": text_content[:160] + "...",
                 }
             )
             context_blocks.append(
-                f"SOURCE: [{payload['source_file']}, Page {payload['page_number']}]\n"
-                f"CONTENT: {payload['text']}"
+                f"SOURCE: [{source_file}, Page {page_number}]\nCONTENT: {text_content}"
             )
 
         # 5. Guardrailed LLM Generation
         llm_start = time.perf_counter()
-        answer_text = self._generate_llm_answer(query, "\n\n---\n\n".join(context_blocks))
+        answer_text = self._generate_llm_answer(
+            query, "\n\n---\n\n".join(context_blocks)
+        )
         llm_ms = (time.perf_counter() - llm_start) * 1000
         total_ms = (time.perf_counter() - total_start) * 1000
 
@@ -142,7 +153,8 @@ class EnterpriseRAGRetriever:
     def _generate_llm_answer(self, query: str, formatted_context: str) -> str:
         if not self.groq_client:
             return (
-                "[DRY-RUN MODE: Set GROQ_API_KEY in .env for live Llama-3 synthesis]\n"
+                f"[DRY-RUN MODE: Set GROQ_API_KEY in .env for live "
+                f"{settings.LLM_MODEL} synthesis]\n"
                 f"Verified Context Retrieved:\n{formatted_context}"
             )
 
@@ -153,19 +165,25 @@ class EnterpriseRAGRetriever:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": f"VERIFIED CONTEXT:\n{formatted_context}\n\nUSER QUESTION: {query}",
+                    "content": (
+                        f"VERIFIED CONTEXT:\n{formatted_context}\n\n"
+                        f"USER QUESTION: {query}"
+                    ),
                 },
             ],
         )
         return completion.choices[0].message.content.strip()
 
     @staticmethod
-    def _abstain_response(role: str, filter_str: str, retrieval_ms: float) -> dict[str, Any]:
+    def _abstain_response(
+        role: str, filter_str: str, retrieval_ms: float
+    ) -> dict[str, Any]:
         return {
             "status": "abstained",
             "answer": (
-                f"Insufficient permissions or data not found. No verified documents matching "
-                f"your role ('{role}') contain relevant information for this query."
+                "Insufficient permissions or data not found. No verified "
+                f"documents matching your role ('{role}') contain relevant "
+                "information for this query."
             ),
             "citations": [],
             "telemetry": {
@@ -174,4 +192,4 @@ class EnterpriseRAGRetriever:
                 "llm_generation_ms": 0.0,
                 "total_latency_ms": round(retrieval_ms, 2),
             },
-        } 
+        }

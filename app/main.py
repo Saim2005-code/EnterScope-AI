@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import RedirectResponse
@@ -15,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global singleton instance initialized once at server startup
-rag_engine: Optional[EnterpriseRAGRetriever] = None
+rag_engine: EnterpriseRAGRetriever | None = None
 
 
 @asynccontextmanager
@@ -50,18 +50,27 @@ class QueryRequest(BaseModel):
         min_length=3,
         max_length=1000,
         description="Natural language question for the enterprise knowledge base.",
-        examples=["What is our maximum PostgreSQL failover RTO and how does Patroni promote replicas?"],
+        examples=[
+            (
+                "What is our maximum PostgreSQL failover RTO and how does "
+                "Patroni promote replicas?"
+            )
+        ],
     )
     user_role: Literal["engineering", "hr", "finance"] = Field(
         ...,
-        description="Strict RBAC department role used to filter Qdrant vector payloads.",
+        description=(
+            "Strict RBAC department role used to filter Qdrant vector payloads."
+        ),
         examples=["engineering"],
     )
     top_k: int = Field(
         default=3,
         ge=1,
         le=10,
-        description="Maximum number of verified chunks to pass to the LLM after reranking.",
+        description=(
+            "Maximum number of verified chunks to pass to the LLM after reranking."
+        ),
     )
 
 
@@ -83,7 +92,7 @@ class Telemetry(BaseModel):
 class QueryResponse(BaseModel):
     status: Literal["success", "abstained"]
     answer: str
-    citations: List[Citation]
+    citations: list[Citation]
     telemetry: Telemetry
 
 
@@ -97,7 +106,7 @@ async def root_redirect() -> RedirectResponse:
 
 
 @app.get("/health", status_code=status.HTTP_200_OK)
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> dict[str, Any]:
     """Readiness probe verifying both FastAPI and Qdrant collection connectivity."""
     if rag_engine is None:
         raise HTTPException(
@@ -113,16 +122,16 @@ async def health_check() -> Dict[str, Any]:
             "qdrant_connected": True,
             "active_collections": collection_names,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error(f"Qdrant health check failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Qdrant connection failed: {str(exc)}",
+            detail=f"Qdrant connection failed: {exc!s}",
         ) from exc
 
 
 @app.post("/ask", response_model=QueryResponse, status_code=status.HTTP_200_OK)
-def ask_question(payload: QueryRequest) -> Dict[str, Any]:
+def ask_question(payload: QueryRequest) -> dict[str, Any]:
     """
     Executes synchronous CPU-bound ONNX embedding/reranking and Qdrant search
     inside FastAPI's threadpool so the main asyncio event loop is never blocked.
@@ -139,9 +148,9 @@ def ask_question(payload: QueryRequest) -> Dict[str, Any]:
             user_role=payload.user_role,
             top_k=payload.top_k,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.exception("Unhandled error during /ask execution")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal RAG pipeline error: {str(exc)}",
+            detail=f"Internal RAG pipeline error: {exc!s}",
         ) from exc
