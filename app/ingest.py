@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 from fastembed import TextEmbedding
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient, models
