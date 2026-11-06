@@ -55,7 +55,7 @@ class EnterpriseRAGRetriever:
         filter_str = f"department == '{normalized_role}'"
 
         # 1. Embed the user query via ONNX
-        query_vector = list(self.embedder.embed([query]))[0].tolist()
+        query_vector = next(iter(self.embedder.embed([query]))).tolist()
 
         # 2. Enforce Strict Qdrant RBAC Payload Filter
         rbac_filter = models.Filter(
