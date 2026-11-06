@@ -1,8 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.retriever import EnterpriseRAGRetriever
@@ -14,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global singleton instance initialized once at server startup
-rag_engine: EnterpriseRAGRetriever | None = None
+rag_engine: Optional[EnterpriseRAGRetriever] = None
 
 
 @asynccontextmanager
@@ -82,15 +83,21 @@ class Telemetry(BaseModel):
 class QueryResponse(BaseModel):
     status: Literal["success", "abstained"]
     answer: str
-    citations: list[Citation]
+    citations: List[Citation]
     telemetry: Telemetry
 
 
 # ==========================================
 # API Endpoints
 # ==========================================
+@app.get("/", include_in_schema=False)
+async def root_redirect() -> RedirectResponse:
+    """Redirects root browser visits directly to the interactive Swagger UI."""
+    return RedirectResponse(url="/docs")
+
+
 @app.get("/health", status_code=status.HTTP_200_OK)
-async def health_check() -> dict[str, Any]:
+async def health_check() -> Dict[str, Any]:
     """Readiness probe verifying both FastAPI and Qdrant collection connectivity."""
     if rag_engine is None:
         raise HTTPException(
@@ -106,16 +113,16 @@ async def health_check() -> dict[str, Any]:
             "qdrant_connected": True,
             "active_collections": collection_names,
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error(f"Qdrant health check failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Qdrant connection failed: {exc!s}",
-        )
+            detail=f"Qdrant connection failed: {str(exc)}",
+        ) from exc
 
 
 @app.post("/ask", response_model=QueryResponse, status_code=status.HTTP_200_OK)
-def ask_question(payload: QueryRequest) -> dict[str, Any]:
+def ask_question(payload: QueryRequest) -> Dict[str, Any]:
     """
     Executes synchronous CPU-bound ONNX embedding/reranking and Qdrant search
     inside FastAPI's threadpool so the main asyncio event loop is never blocked.
@@ -132,9 +139,9 @@ def ask_question(payload: QueryRequest) -> dict[str, Any]:
             user_role=payload.user_role,
             top_k=payload.top_k,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Unhandled error during /ask execution")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal RAG pipeline error: {exc!s}",
-        )
+            detail=f"Internal RAG pipeline error: {str(exc)}",
+        ) from exc
