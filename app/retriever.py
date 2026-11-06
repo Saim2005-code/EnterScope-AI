@@ -38,8 +38,7 @@ class EnterpriseRAGRetriever:
         self.groq_client = (
             Groq(api_key=settings.GROQ_API_KEY)
             if settings.GROQ_API_KEY
-            and settings.GROQ_API_KEY
-            not in ("your_groq_api_key_here", "your_groq_api_here")
+            and settings.GROQ_API_KEY not in ("your_groq_api_key_here", "your_groq_api_here")
             else None
         )
 
@@ -132,9 +131,7 @@ class EnterpriseRAGRetriever:
 
         # 5. Guardrailed LLM Generation
         llm_start = time.perf_counter()
-        answer_text = self._generate_llm_answer(
-            query, "\n\n---\n\n".join(context_blocks)
-        )
+        answer_text = self._generate_llm_answer(query, "\n\n---\n\n".join(context_blocks))
         llm_ms = (time.perf_counter() - llm_start) * 1000
         total_ms = (time.perf_counter() - total_start) * 1000
 
@@ -166,8 +163,7 @@ class EnterpriseRAGRetriever:
                 {
                     "role": "user",
                     "content": (
-                        f"VERIFIED CONTEXT:\n{formatted_context}\n\n"
-                        f"USER QUESTION: {query}"
+                        f"VERIFIED CONTEXT:\n{formatted_context}\n\nUSER QUESTION: {query}"
                     ),
                 },
             ],
@@ -175,9 +171,7 @@ class EnterpriseRAGRetriever:
         return completion.choices[0].message.content.strip()
 
     @staticmethod
-    def _abstain_response(
-        role: str, filter_str: str, retrieval_ms: float
-    ) -> dict[str, Any]:
+    def _abstain_response(role: str, filter_str: str, retrieval_ms: float) -> dict[str, Any]:
         return {
             "status": "abstained",
             "answer": (

@@ -51,26 +51,19 @@ class QueryRequest(BaseModel):
         max_length=1000,
         description="Natural language question for the enterprise knowledge base.",
         examples=[
-            (
-                "What is our maximum PostgreSQL failover RTO and how does "
-                "Patroni promote replicas?"
-            )
+            ("What is our maximum PostgreSQL failover RTO and how does Patroni promote replicas?")
         ],
     )
     user_role: Literal["engineering", "hr", "finance"] = Field(
         ...,
-        description=(
-            "Strict RBAC department role used to filter Qdrant vector payloads."
-        ),
+        description=("Strict RBAC department role used to filter Qdrant vector payloads."),
         examples=["engineering"],
     )
     top_k: int = Field(
         default=3,
         ge=1,
         le=10,
-        description=(
-            "Maximum number of verified chunks to pass to the LLM after reranking."
-        ),
+        description=("Maximum number of verified chunks to pass to the LLM after reranking."),
     )
 
 

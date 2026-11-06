@@ -78,9 +78,7 @@ def extract_and_chunk_pdfs(data_dir: Path) -> list[dict[str, Any]]:
                     }
                 )
         doc.close()
-        logger.info(
-            f"Parsed '{pdf_path.name}' -> Assigned RBAC Role: [department={department}]"
-        )
+        logger.info(f"Parsed '{pdf_path.name}' -> Assigned RBAC Role: [department={department}]")
 
     return structured_chunks
 
@@ -145,7 +143,7 @@ def run_ingestion() -> None:
             vector=vector.tolist(),
             payload=chunk["payload"],
         )
-        for chunk, vector in zip(chunks, embeddings)
+        for chunk, vector in zip(chunks, embeddings, strict=True)
     ]
 
     client.upsert(
