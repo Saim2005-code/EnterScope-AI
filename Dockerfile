@@ -2,7 +2,7 @@
 # ==========================================
 # Stage 1: Builder
 # ==========================================
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /build
 
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ==========================================
 # Stage 2: Production Runtime
 # ==========================================
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
 WORKDIR /app
 
