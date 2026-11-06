@@ -2,7 +2,7 @@ import logging
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import fitz  # PyMuPDF
 from fastembed import TextEmbedding
@@ -32,7 +32,7 @@ def infer_department_from_filename(filename: str) -> str:
     return role_map.get(prefix, "general")
 
 
-def extract_and_chunk_pdfs(data_dir: Path) -> List[Dict[str, Any]]:
+def extract_and_chunk_pdfs(data_dir: Path) -> list[dict[str, Any]]:
     """Pipeline 1: Extracts text page-by-page from PDFs and splits into tagged chunks."""
     pdf_files = sorted(data_dir.glob("*.pdf"))
     if not pdf_files:
@@ -46,7 +46,7 @@ def extract_and_chunk_pdfs(data_dir: Path) -> List[Dict[str, Any]]:
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
-    structured_chunks: List[Dict[str, Any]] = []
+    structured_chunks: list[dict[str, Any]] = []
 
     for pdf_path in pdf_files:
         department = infer_department_from_filename(pdf_path.name)

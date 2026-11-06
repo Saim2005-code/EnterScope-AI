@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
@@ -46,7 +46,7 @@ class EnterpriseRAGRetriever:
         user_role: str,
         top_k: int = 3,
         score_threshold: float = -3.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Executes Pipeline 3 (RBAC Retrieval + Rerank) & Pipeline 4 (Guardrailed LLM)."""
         total_start = time.perf_counter()
         retrieval_start = time.perf_counter()
@@ -102,8 +102,8 @@ class EnterpriseRAGRetriever:
             return self._abstain_response(normalized_role, filter_str, retrieval_ms)
 
         # 4. Build Citations & Context Block for LLM
-        citations: List[Dict[str, Any]] = []
-        context_blocks: List[str] = []
+        citations: list[dict[str, Any]] = []
+        context_blocks: list[str] = []
 
         for pt, score in verified_hits:
             payload = pt.payload
@@ -160,7 +160,7 @@ class EnterpriseRAGRetriever:
         return completion.choices[0].message.content.strip()
 
     @staticmethod
-    def _abstain_response(role: str, filter_str: str, retrieval_ms: float) -> Dict[str, Any]:
+    def _abstain_response(role: str, filter_str: str, retrieval_ms: float) -> dict[str, Any]:
         return {
             "status": "abstained",
             "answer": (
