@@ -92,3 +92,64 @@ def test_invalid_role_rejected_by_pydantic(client: TestClient):
     }
     response = client.post("/ask", json=payload)
     assert response.status_code == 422
+
+
+def test_ingest_text_document_success(client: TestClient):
+    """Test 6: Ingests a new document via /ingest and verifies retrieval under that role."""
+    file_content = (
+        b"Finance Policy Section 1.1: Q4 Enterprise Budget and Cloud Spend.\n"
+        b"The annual cloud infrastructure budget is strictly capped at $1.2M annually.\n"
+        b"All discretionary software purchases over $10,000 require CFO signoff."
+    )
+    files = {
+        "file": ("fin_cloud_budget.txt", file_content, "text/plain"),
+    }
+    data = {
+        "department": "finance",
+    }
+    response = client.post("/ingest", files=files, data=data)
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["status"] == "success"
+    assert res_data["file_name"] == "fin_cloud_budget.txt"
+    assert res_data["department"] == "finance"
+    assert res_data["chunks_count"] >= 1
+
+    # Now verify querying with finance role can retrieve this ingested document
+    ask_payload = {
+        "query": "What is the annual cloud infrastructure budget cap?",
+        "user_role": "finance",
+        "top_k": 2,
+    }
+    ask_response = client.post("/ask", json=ask_payload)
+    assert ask_response.status_code == 200
+    ask_data = ask_response.json()
+    assert ask_data["status"] == "success"
+    assert len(ask_data["citations"]) > 0
+    assert any(c["source_file"] == "fin_cloud_budget.txt" for c in ask_data["citations"])
+
+
+def test_ingest_unsupported_file_type(client: TestClient):
+    """Test 7: Uploading unsupported file format is rejected with HTTP 400."""
+    files = {
+        "file": ("malicious_payload.exe", b"MZbinarycontent", "application/octet-stream"),
+    }
+    data = {
+        "department": "engineering",
+    }
+    response = client.post("/ingest", files=files, data=data)
+    assert response.status_code == 400
+    assert "Unsupported file type" in response.json()["detail"]
+
+
+def test_ingest_empty_file_rejected(client: TestClient):
+    """Test 8: Uploading an empty file is rejected with HTTP 400."""
+    files = {
+        "file": ("empty_policy.txt", b"", "text/plain"),
+    }
+    data = {
+        "department": "engineering",
+    }
+    response = client.post("/ingest", files=files, data=data)
+    assert response.status_code == 400
+    assert "Uploaded file is empty" in response.json()["detail"]

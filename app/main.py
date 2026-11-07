@@ -1,12 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.ingest import ingest_file_bytes, init_qdrant_collection
 from app.retriever import EnterpriseRAGRetriever
 
 logging.basicConfig(
@@ -25,6 +26,10 @@ async def lifespan(app: FastAPI):
     global rag_engine
     logger.info("Starting up FastAPI: Loading ONNX models and connecting to Qdrant...")
     rag_engine = EnterpriseRAGRetriever()
+    try:
+        init_qdrant_collection(rag_engine.qdrant)
+    except (ConnectionError, RuntimeError, OSError) as exc:
+        logger.warning(f"Could not verify/create Qdrant collection on startup: {exc}")
     logger.info("EnterpriseRAGRetriever singleton initialized and ready.")
     yield
     logger.info("Shutting down Enterprise RAG API...")
@@ -98,6 +103,15 @@ class QueryResponse(BaseModel):
     telemetry: Telemetry
 
 
+class IngestionResponse(BaseModel):
+    status: str
+    message: str
+    file_name: str
+    department: str
+    chunks_count: int
+    total_points_in_collection: int | None = None
+
+
 # ==========================================
 # API Endpoints
 # ==========================================
@@ -129,6 +143,60 @@ async def health_check() -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Qdrant connection failed: {exc!s}",
+        ) from exc
+
+
+@app.post("/ingest", response_model=IngestionResponse, status_code=status.HTTP_200_OK)
+def ingest_document(
+    file: Annotated[UploadFile, File(...)],
+    department: Annotated[str, Form(...)],
+) -> dict[str, Any]:
+    """
+    Ingests an uploaded enterprise document (PDF, DOCX, TXT, MD),
+    extracts & chunks content with RBAC department tags, embeds with ONNX,
+    and upserts into Qdrant vector database.
+    """
+    if rag_engine is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG Engine is not initialized.",
+        )
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No filename provided in upload.",
+        )
+
+    allowed_extensions = (".pdf", ".docx", ".txt", ".md")
+    if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type. Supported types: {', '.join(allowed_extensions)}",
+        )
+
+    try:
+        content = file.file.read()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is empty.",
+            )
+
+        return ingest_file_bytes(
+            filename=file.filename,
+            file_bytes=content,
+            department=department.strip().lower(),
+            client=rag_engine.qdrant,
+            embedder=rag_engine.embedder,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(f"Unhandled error during /ingest execution for {file.filename}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal ingestion pipeline error: {exc!s}",
         ) from exc
 
 
