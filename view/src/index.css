@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "katex/dist/katex.min.css";
+
+@theme {
+  --font-serif: "Merriweather", "Charter", Georgia, Cambria, "Times New Roman", Times, serif;
+}
 
 @layer base {
   body {
@@ -7,4 +13,27 @@
     color: #f4f4f5;
     font-family: Inter, system-ui, -apple-system, sans-serif;
   }
+}
+
+/* Textbook Typography & KaTeX Math Refinements */
+.textbook-prose .katex {
+  font-size: 1.06em;
+  line-height: 1.2;
+  color: #fef3c7; /* Soft warm ivory for mathematical expressions */
+}
+
+.textbook-prose .katex-display {
+  margin: 1.25em 0 !important;
+  padding: 0.75em 1em;
+  background: rgba(24, 24, 27, 0.5);
+  border: 1px solid rgba(63, 63, 70, 0.4);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.textbook-prose .katex-display > .katex {
+  color: #fef08a;
+  font-size: 1.15em;
 }

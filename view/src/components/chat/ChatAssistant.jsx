@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Sparkles, Paperclip, Send, ShieldAlert } from 'lucide-react';
 import CitationList from './CitationList';
+import TextbookResponse from './TextbookResponse';
 import { queryRagAssistant } from '../../services/ragApi';
 
 export default function ChatAssistant({ currentRole, messages, setMessages }) {
@@ -72,17 +73,18 @@ export default function ChatAssistant({ currentRole, messages, setMessages }) {
           ) : (
             <div
               key={msg.id}
-              className="p-5 rounded-xl bg-[#121215] border border-[#232329] flex items-start gap-3"
+              className="p-5 sm:p-6 rounded-xl bg-[#121215] border border-[#232329] flex items-start gap-3.5 shadow-sm"
             >
               {msg.status === 'abstained' ? (
-                <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-1" />
               ) : (
-                <Sparkles className="w-5 h-5 text-zinc-300 shrink-0 mt-0.5" />
+                <Sparkles className="w-5 h-5 text-amber-300/80 shrink-0 mt-1" />
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-zinc-200 whitespace-pre-line leading-relaxed">
-                  {msg.answer}
-                </div>
+                <TextbookResponse
+                  content={msg.answer}
+                  isAbstained={msg.status === 'abstained'}
+                />
                 <CitationList citations={msg.citations} />
               </div>
             </div>
